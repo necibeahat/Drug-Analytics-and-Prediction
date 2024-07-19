@@ -1,2 +1,3 @@
-# OpenFDA_SampleProject
-Sample project using drug endpoint data from OpenFDA
+# Data analytics and prediction on Drug data
+
+TBC
