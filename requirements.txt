@@ -1,0 +1,27 @@
+# OpenFDA Drug Data Analysis Requirements
+# Core data processing and analysis libraries
+pandas>=1.3.0
+numpy>=1.21.0
+
+# Machine learning and statistical analysis
+scikit-learn>=1.0.0
+
+# Data visualization
+matplotlib>=3.4.0
+seaborn>=0.11.0
+
+# Jupyter notebook support
+jupyter>=1.0.0
+ipykernel>=6.0.0
+
+# Development and testing
+pytest>=6.0.0
+pytest-cov>=2.12.0
+
+# Optional: For enhanced data processing
+openpyxl>=3.0.0  # For Excel file support if needed
+requests>=2.25.0  # For API calls if needed
+
+# Code quality and formatting (optional)
+black>=21.0.0
+flake8>=3.9.0
