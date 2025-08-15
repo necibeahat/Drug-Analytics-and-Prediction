@@ -1,7 +1,13 @@
 # OpenFDA Drug Data Analysis Requirements
 # Core data processing and analysis libraries
 pandas>=1.3.0
-numpy>=1.21.0
+# OpenFDA Drug Data Analysis Requirements
+# Core data processing and analysis libraries
+pandas>=1.3.0
+numpy>=1.22.0
+
+# Machine learning and statistical analysis
+scikit-learn>=1.0.0
 
 # Machine learning and statistical analysis
 scikit-learn>=1.0.0
