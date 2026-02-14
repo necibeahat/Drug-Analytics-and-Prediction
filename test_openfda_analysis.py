@@ -2,9 +2,10 @@ import unittest
 import pandas as pd
 import numpy as np
 import json
-from unittest.mock import patch, mock_open
+from unittest.mock import patch, mock_open, MagicMock
 import sys
 import os
+import warnings
 
 # Add the current directory to the path to import functions
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -190,6 +191,157 @@ class TestOpenFDAAnalysis(unittest.TestCase):
         self.assertTrue(isinstance(X, np.ndarray))
         self.assertTrue(isinstance(y, np.ndarray))
 
+class TestCalcAvgIngComprehensive(unittest.TestCase):
+    """Comprehensive tests for calc_avg_ing function"""
+    
+    def test_empty_string_in_list(self):
+        """Test with empty string in list"""
+        result = calc_avg_ing([''])
+        self.assertEqual(result, 1)
+    
+    def test_single_ingredient(self):
+        """Test with single ingredient"""
+        result = calc_avg_ing(['aspirin'])
+        self.assertEqual(result, 1)
+    
+    def test_multiple_ingredients(self):
+        """Test with multiple ingredients"""
+        result = calc_avg_ing(['ing1,ing2,ing3,ing4,ing5'])
+        self.assertEqual(result, 5)
+    
+    def test_special_characters(self):
+        """Test with special characters in ingredients"""
+        result = calc_avg_ing(['ing@1,ing#2,ing$3'])
+        self.assertEqual(result, 3)
+    
+    def test_whitespace_in_ingredients(self):
+        """Test with whitespace in ingredients"""
+        result = calc_avg_ing(['ingredient 1, ingredient 2'])
+        self.assertEqual(result, 2)
+    
+    def test_unicode_characters(self):
+        """Test with unicode characters"""
+        result = calc_avg_ing(['café,naïve,résumé'])
+        self.assertEqual(result, 3)
+    
+    def test_empty_list_raises_error(self):
+        """Test that empty list raises IndexError"""
+        with self.assertRaises(IndexError):
+            calc_avg_ing([])
+    
+    def test_none_value_raises_error(self):
+        """Test that None value raises TypeError"""
+        with self.assertRaises(TypeError):
+            calc_avg_ing(None)
+    
+    def test_none_in_list_raises_error(self):
+        """Test that None in list raises AttributeError"""
+        with self.assertRaises(AttributeError):
+            calc_avg_ing([None])
+    
+    def test_large_ingredient_count(self):
+        """Test with large number of ingredients"""
+        ingredients = ','.join([f'ing{i}' for i in range(100)])
+        result = calc_avg_ing([ingredients])
+        self.assertEqual(result, 100)
+
+
+class TestGetInStrComprehensive(unittest.TestCase):
+    """Comprehensive tests for get_in_str function"""
+    
+    def test_simple_string_list(self):
+        """Test with simple string in list"""
+        result = get_in_str(['test_drug'])
+        self.assertEqual(result, 'test_drug')
+    
+    def test_comma_separated_list(self):
+        """Test with comma-separated values"""
+        result = get_in_str(['drug1,drug2,drug3'])
+        self.assertEqual(result, 'drug1,drug2,drug3')
+    
+    def test_nan_value_returns_original(self):
+        """Test that NaN value returns original list"""
+        nan_list = [np.nan]
+        result = get_in_str(nan_list)
+        self.assertTrue(isinstance(result, list))
+    
+    def test_empty_string_list(self):
+        """Test with empty string in list"""
+        result = get_in_str([''])
+        self.assertEqual(result, '')
+    
+    def test_special_characters(self):
+        """Test with special characters"""
+        result = get_in_str(['drug@name,drug#2'])
+        self.assertEqual(result, 'drug@name,drug#2')
+    
+    def test_none_value_handling(self):
+        """Test handling of None value"""
+        result = get_in_str(None)
+        self.assertIsNone(result)
+    
+    def test_empty_list_handling(self):
+        """Test handling of empty list"""
+        result = get_in_str([])
+        self.assertEqual(result, [])
+    
+    def test_numeric_values(self):
+        """Test with numeric values in list"""
+        result = get_in_str([123])
+        self.assertEqual(result, [123])
+
+
+class TestProcessOpenfdaDataComprehensive(unittest.TestCase):
+    """Comprehensive tests for process_openfda_data function"""
+    
+    def setUp(self):
+        """Set up valid test DataFrame"""
+        self.valid_data = {
+            'openfda.generic_name': [['aspirin'], ['ibuprofen']],
+            'spl_product_data_elements': [['ing1,ing2'], ['ing1']],
+            'drug_interactions': [['interaction1'], ['interaction2']],
+            'openfda.manufacturer_name': [['Pfizer'], ['Bayer']],
+            'effective_time': ['20200101', '20210315'],
+            'openfda.route': [['ORAL'], ['TOPICAL']]
+        }
+        self.valid_df = pd.DataFrame(self.valid_data)
+    
+    def test_valid_dataframe_processing(self):
+        """Test processing valid DataFrame"""
+        result = process_openfda_data(self.valid_df)
+        self.assertIsInstance(result, pd.DataFrame)
+        self.assertIn('year', result.columns)
+        self.assertIn('num_ingredients', result.columns)
+    
+    def test_invalid_date_filtering(self):
+        """Test that invalid dates are filtered out"""
+        data = self.valid_data.copy()
+        data['effective_time'] = ['20200101', '2021']  # Second date invalid
+        df = pd.DataFrame(data)
+        result = process_openfda_data(df)
+        self.assertEqual(len(result), 1)
+    
+    def test_nan_filtering(self):
+        """Test that NaN values are filtered"""
+        data = self.valid_data.copy()
+        data['spl_product_data_elements'] = [['ing1,ing2'], None]
+        df = pd.DataFrame(data)
+        result = process_openfda_data(df)
+        self.assertEqual(len(result), 1)
+    
+    def test_output_dtypes(self):
+        """Test output data types"""
+        result = process_openfda_data(self.valid_df)
+        self.assertEqual(result['year'].dtype, np.int64)
+        self.assertEqual(result['num_ingredients'].dtype, np.int64)
+    
+    def test_year_extraction(self):
+        """Test year is correctly extracted"""
+        result = process_openfda_data(self.valid_df)
+        self.assertIn(2020, result['year'].values)
+        self.assertIn(2021, result['year'].values)
+
+
 class TestDataIntegrity(unittest.TestCase):
     """Test data integrity and edge cases"""
     
@@ -232,13 +384,102 @@ class TestDataIntegrity(unittest.TestCase):
         
         self.assertEqual(invalid_count, len(invalid_dates))
 
+
+class TestErrorHandling(unittest.TestCase):
+    """Test error handling scenarios"""
+    
+    def test_calc_avg_ing_with_integer(self):
+        """Test calc_avg_ing with integer input"""
+        with self.assertRaises(TypeError):
+            calc_avg_ing(123)
+    
+    def test_calc_avg_ing_with_dict(self):
+        """Test calc_avg_ing with dict input"""
+        with self.assertRaises(KeyError):
+            calc_avg_ing({'key': 'value'})
+    
+    def test_get_in_str_with_nested_list(self):
+        """Test get_in_str with nested list"""
+        result = get_in_str([['nested', 'list']])
+        self.assertIsNotNone(result)
+    
+    def test_process_openfda_missing_columns(self):
+        """Test process_openfda_data with missing columns"""
+        df = pd.DataFrame({'wrong_col': [1, 2, 3]})
+        with self.assertRaises(KeyError):
+            process_openfda_data(df)
+    
+    def test_filter_by_manufacturer_empty_result(self):
+        """Test filter when no manufacturer matches"""
+        df = pd.DataFrame({
+            'manufacturer': ['Pfizer', 'Bayer'],
+            'num_ingredients': [2, 3]
+        })
+        result = filter_by_manufacturer(df, 'NonExistent')
+        self.assertEqual(len(result), 0)
+
+
+class TestIntegrationPipeline(unittest.TestCase):
+    """Integration tests for data processing pipeline"""
+    
+    def setUp(self):
+        """Set up integration test data"""
+        self.pipeline_data = {
+            'openfda.generic_name': [['aspirin'], ['ibuprofen'], ['acetaminophen']],
+            'spl_product_data_elements': [['a,b,c'], ['x,y'], ['p,q,r,s']],
+            'drug_interactions': [['int1'], ['int2'], ['int3']],
+            'openfda.manufacturer_name': [['Pfizer'], ['Pfizer'], ['Bayer']],
+            'effective_time': ['20200101', '20200601', '20210101'],
+            'openfda.route': [['ORAL'], ['ORAL'], ['TOPICAL']]
+        }
+        self.pipeline_df = pd.DataFrame(self.pipeline_data)
+    
+    def test_end_to_end_processing(self):
+        """Test complete data processing pipeline"""
+        processed = process_openfda_data(self.pipeline_df)
+        self.assertEqual(len(processed), 3)
+        self.assertTrue(all(col in processed.columns for col in 
+                          ['year', 'drug_names', 'num_ingredients', 'route', 'manufacturer']))
+    
+    def test_processing_then_filtering(self):
+        """Test processing followed by manufacturer filtering"""
+        processed = process_openfda_data(self.pipeline_df)
+        filtered = filter_by_manufacturer(processed, 'Pfizer')
+        self.assertEqual(len(filtered), 2)
+    
+    def test_processing_then_analysis(self):
+        """Test processing followed by yearly analysis"""
+        processed = process_openfda_data(self.pipeline_df)
+        analysis = analyze_ingredients_by_year(processed)
+        self.assertIn('avg_ingredients', analysis.columns)
+    
+    def test_prediction_model_creation(self):
+        """Test prediction model with processed data"""
+        processed = process_openfda_data(self.pipeline_df)
+        model_result = create_prediction_model(processed)
+        self.assertIn('model', model_result)
+        self.assertIn('metrics', model_result)
+    
+    def test_summary_report_generation(self):
+        """Test summary report generation"""
+        processed = process_openfda_data(self.pipeline_df)
+        report = generate_summary_report(processed)
+        self.assertIn('dataset_info', report)
+        self.assertIn('ingredient_statistics', report)
+
+
 if __name__ == '__main__':
     # Create a test suite
     test_suite = unittest.TestSuite()
     
     # Add test classes
     test_suite.addTest(unittest.makeSuite(TestOpenFDAAnalysis))
+    test_suite.addTest(unittest.makeSuite(TestCalcAvgIngComprehensive))
+    test_suite.addTest(unittest.makeSuite(TestGetInStrComprehensive))
+    test_suite.addTest(unittest.makeSuite(TestProcessOpenfdaDataComprehensive))
     test_suite.addTest(unittest.makeSuite(TestDataIntegrity))
+    test_suite.addTest(unittest.makeSuite(TestErrorHandling))
+    test_suite.addTest(unittest.makeSuite(TestIntegrationPipeline))
     
     # Run the tests
     runner = unittest.TextTestRunner(verbosity=2)
